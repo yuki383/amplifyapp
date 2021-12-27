@@ -1,24 +1,92 @@
-import logo from "./logo.svg";
 import "./App.css";
 import { useAuthenticator, withAuthenticator } from "@aws-amplify/ui-react";
-import '@aws-amplify/ui-react/styles.css'
+import "@aws-amplify/ui-react/styles.css";
+import { useEffect, useState } from "react";
+import { API } from "aws-amplify";
+import { listNotes } from "./graphql/queries";
+import {
+  createNote as createNoteMutation,
+  deleteNote as deleteNoteMutation,
+} from "./graphql/mutations";
+
+const initialFormState = {
+  name: "",
+  description: "",
+};
 
 function App(props) {
-  const hoge = useAuthenticator();
-  console.log({ props, hoge });
+  const auth = useAuthenticator();
+
+  const [notes, setNotes] = useState([]);
+  const [formData, setFormData] = useState(initialFormState);
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  async function fetchNotes() {
+    const apiData = await API.graphql({ query: listNotes });
+    setNotes(apiData.data.listNotes.items);
+  }
+
+  async function createNote() {
+    console.log(formData)
+
+    if (!formData.name || !formData.description) {
+      return;
+    }
+
+    console.log('hogehoge')
+
+    await API.graphql({
+      query: createNoteMutation,
+      variables: { input: formData },
+    });
+
+    setNotes([...notes, formData]);
+    setFormData(initialFormState);
+  }
+
+  async function deleteNote({ id }) {
+    const newNotesArray = notes.filter((note) => note !== id);
+    setNotes(newNotesArray);
+
+    await API.graphql({ query: deleteNoteMutation, variables: { input: id } });
+  }
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <h1>We now have Auth!</h1>
-        <div>Hello {hoge.user.username}</div>
+      <h1>My Note App</h1>
+      <div>user: {auth.user.username}</div>
+      <input
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        placeholder="Note name"
+        vlaue={formData.name}
+      />
+      <input
+        onChange={(e) =>
+          setFormData({ ...formData, description: e.target.value })
+        }
+        placeholder="Note description"
+        vlaue={formData.description}
+      />
+      <button onClick={createNote}>Create Note</button>
+      <div style={{ marginBottom: 30 }}>
+        {notes.map((note) => (
+          <div key={note.id || note.name}>
+            <h2>{note.name}</h2>
+            <p>{note.description}</p>
+            <button onClick={() => deleteNote(note)}>Delete note</button>
+          </div>
+        ))}
+      </div>
       <div>
         <h2>SignOut</h2>
-        <button onClick={hoge.signOut}>Sign Out</button>
+        <button onClick={auth.signOut}>Sign Out</button>
       </div>
-      </header>
     </div>
   );
 }
 
 export default withAuthenticator(App);
+
